@@ -18,7 +18,7 @@ import faiss
 from openai import OpenAI
 import config
 
-# --- LOAD ENV ---
+# Load environment variables
 load_dotenv()  # Load environment variables from .env
 api_key = config.OPENAI_API_KEY
 if not api_key:
@@ -27,10 +27,10 @@ if not api_key:
 # Initialize OpenAI client
 client = OpenAI(api_key=api_key)
 
-# --- PAGE CONFIG ---
+# Page configuration
 st.set_page_config(page_title=config.PAGE_TITLE, layout=config.LAYOUT)
 
-# --- CUSTOM CSS STYLING ---
+# Custom CSS styling
 st.markdown("""
 <style>
     /* Main title styling */
@@ -217,14 +217,14 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- SETTINGS ---
+# Settings
 API_URL = config.NOAA_ALERTS_URL
 HEADERS = config.HEADERS
 
-# --- AUTO REFRESH ---
+# Auto refresh
 st_autorefresh(interval=config.AUTO_REFRESH_INTERVAL, key="refresh")  # refresh every 5 mins
 
-# --- CHATBOT FUNCTIONS ---
+# Chatbot functions
 @st.cache_data
 def load_educational_data():
     """Load educational content about severe weather"""
@@ -316,7 +316,7 @@ Respond in a helpful, educational tone suitable for the general public."""
     except Exception as e:
         return f"I'm having trouble connecting to my weather knowledge base. Please try again later. Error: {str(e)}"
 
-# --- MAIN APP ---
+# Main app
 st.markdown(f'<h1 class="main-title">🌪️ {config.APP_TITLE}</h1>', unsafe_allow_html=True)
 
 # Display safety disclaimer
@@ -328,7 +328,7 @@ mode = st.sidebar.radio("Mode", ["Live Alerts", "Weather Chatbot", "Learn", "His
 # Load educational data
 educational_data = load_educational_data()
 
-# --- ML WEATHER INSIGHTS MODE ---
+# ML Weather Insights Mode
 if mode == "ML Weather Insights":
     st.markdown('<h2 class="section-header">🤖 ML Weather Pattern Analysis</h2>', unsafe_allow_html=True)
     st.markdown('<p class="large-text">Discover AI-powered insights about weather patterns and get personalized risk assessments!</p>', unsafe_allow_html=True)
@@ -678,7 +678,7 @@ if mode == "ML Weather Insights":
                 - **+24 hours:** Conditions expected to remain stable
                 """)
 
-# --- WEATHER CHATBOT MODE ---
+# Weather Chatbot Mode
 elif mode == "Weather Chatbot":
     st.markdown('<h2 class="section-header">🤖 Weather Expert Chatbot</h2>', unsafe_allow_html=True)
     st.markdown('<p class="large-text">Ask me anything about severe weather, tornadoes, thunderstorms, or current weather conditions!</p>', unsafe_allow_html=True)
@@ -796,7 +796,7 @@ elif mode == "Weather Chatbot":
             st.session_state.messages.append({"role": "assistant", "content": response})
             st.rerun()
 
-# --- WEATHER TIMELINE MODE ---
+# Weather Timeline Mode
 elif mode == "Weather Timeline":
     st.markdown('<h2 class="section-header">⏰ Weather Alert Timeline</h2>', unsafe_allow_html=True)
     st.markdown('<p class="large-text">Track the evolution of weather events and see how alerts develop over time!</p>', unsafe_allow_html=True)
@@ -898,7 +898,7 @@ elif mode == "Weather Timeline":
     except Exception as e:
         st.markdown(f'<div class="error-box"><p class="large-text">Error loading timeline: {e}</p></div>', unsafe_allow_html=True)
 
-# --- PHOTO GALLERY MODE ---
+# Photo Gallery Mode
 elif mode == "Photo Gallery":
     st.markdown('<h2 class="section-header">📸 Weather Photography Gallery</h2>', unsafe_allow_html=True)
     st.markdown('<p class="large-text">Explore stunning weather photography and learn about different weather phenomena!</p>', unsafe_allow_html=True)
@@ -1079,7 +1079,7 @@ elif mode == "Photo Gallery":
     </div>
     """, unsafe_allow_html=True)
 
-# --- WEATHER QUIZ MODE ---
+# Weather Quiz Mode
 elif mode == "Weather Quiz":
     st.markdown('<h2 class="section-header">🧠 Weather Knowledge Quiz</h2>', unsafe_allow_html=True)
     st.markdown('<p class="large-text">Test your weather knowledge with interactive quizzes and learn while having fun!</p>', unsafe_allow_html=True)
@@ -1260,7 +1260,7 @@ elif mode == "Weather Quiz":
                 st.session_state.quiz_completed = False
                 st.rerun()
 
-# --- EMERGENCY KIT BUILDER MODE ---
+# Emergency Kit Builder Mode
 elif mode == "Emergency Kit Builder":
     st.markdown('<h2 class="section-header">🛡️ Emergency Kit Builder</h2>', unsafe_allow_html=True)
     st.markdown('<p class="large-text">Build your personalized emergency kit based on your location and weather risks!</p>', unsafe_allow_html=True)
@@ -1418,7 +1418,7 @@ elif mode == "Emergency Kit Builder":
                  </div>
          """, unsafe_allow_html=True)
 
-# --- TRAVEL PLANNER MODE ---
+# Travel Planner Mode
 elif mode == "Travel Planner":
     st.markdown('<h2 class="section-header">✈️ Weather Travel Planner</h2>', unsafe_allow_html=True)
     st.markdown('<p class="large-text">Plan your trips with weather intelligence! Get route analysis, safety precautions, and alternative planning for both driving and flying.</p>', unsafe_allow_html=True)
@@ -1886,7 +1886,7 @@ elif mode == "Travel Planner":
                 
                 st.markdown('</div>', unsafe_allow_html=True)
 
-# --- WEATHER IMPACT CALCULATOR MODE ---
+# Weather Impact Calculator Mode
 elif mode == "Weather Impact Calculator":
     st.markdown('<h2 class="section-header">🧮 Weather Impact Calculator</h2>', unsafe_allow_html=True)
     st.markdown('<p class="large-text">Calculate the economic and social impact of weather events on different sectors and communities!</p>', unsafe_allow_html=True)
@@ -2086,7 +2086,7 @@ elif mode == "Weather Impact Calculator":
             </div>
             """, unsafe_allow_html=True)
 
-# --- LEARN MODE ---
+# Learn Mode
 elif mode == "Learn":
     st.markdown('<h2 class="section-header">📚 Educational Center: Severe Weather Deep Dive</h2>', unsafe_allow_html=True)
 
@@ -2439,7 +2439,7 @@ elif mode == "Learn":
     st.markdown('<h3 class="subsection-header">⚠️ General Severe Weather Safety Tips</h3>', unsafe_allow_html=True)
     st.markdown('<div class="metric-card"><ul class="large-text"><li>Always have multiple ways to receive weather alerts (smartphone apps, NOAA Weather Radio, local news)</li><li>Prepare a family emergency plan and practice it regularly</li><li>Assemble an emergency kit: water, non-perishable food, flashlight, batteries, medications, important documents</li><li>Know your community\'s emergency shelters and evacuation routes</li><li>Never underestimate the power of severe weather—stay informed and act promptly</li></ul></div>', unsafe_allow_html=True)
 
-# --- LIVE ALERTS AND HISTORICAL ALERTS MODE ---
+# Live Alerts and Historical Alerts Mode
 elif mode in ["Live Alerts", "Historical Alerts"]:
     start_date = None
     end_date = None
@@ -2452,7 +2452,7 @@ elif mode in ["Live Alerts", "Historical Alerts"]:
         end_date = st.sidebar.date_input("End Date", value=today, min_value=start_date, max_value=today)
         fetch_historical = st.sidebar.button("🔍 Fetch Historical Alerts")
 
-    # --- FETCH ALERTS ---
+    # Fetch alerts
     alerts = []
     try:
         if mode == "Historical Alerts" and start_date and end_date and fetch_historical:
@@ -2474,7 +2474,7 @@ elif mode in ["Live Alerts", "Historical Alerts"]:
         if mode == "Historical Alerts":
             st.markdown('<div class="info-box"><p class="large-text">💡 <strong>Tip:</strong> Historical data may be limited. Try a smaller date range or different dates.</p></div>', unsafe_allow_html=True)
 
-    # --- DYNAMIC STATE LIST ---
+    # Dynamic state list
     all_states = set()
     for alert in alerts:
         area_desc = alert["properties"].get("areaDesc", "")
@@ -2484,7 +2484,7 @@ elif mode in ["Live Alerts", "Historical Alerts"]:
                 all_states.add(p)
     state_options = ["All"] + sorted(all_states)
 
-    # --- DYNAMIC EVENT TYPE LIST ---
+    # Dynamic event type list
     all_events = set()
     for alert in alerts:
         event = alert["properties"].get("event", "")
@@ -2492,13 +2492,13 @@ elif mode in ["Live Alerts", "Historical Alerts"]:
             all_events.add(event)
     event_options = ["All"] + sorted(all_events)
 
-    # --- SIDEBAR FILTERS ---
+    # Sidebar filters
     st.sidebar.title("Filters")
     selected_state = st.sidebar.selectbox("Filter by State (or All)", state_options)
     selected_event = st.sidebar.selectbox("Filter by Event Type (or All)", event_options)
     user_zip = st.sidebar.text_input("Enter your ZIP code to see nearby alerts (optional)")
 
-    # --- FILTER ALERTS ---
+    # Filter alerts
     filtered_alerts = []
     for alert in alerts:
         props = alert["properties"]
@@ -2510,11 +2510,11 @@ elif mode in ["Live Alerts", "Historical Alerts"]:
 
     st.markdown(f'<h3 class="subsection-header">🔎 Showing {len(filtered_alerts)} {"Historical" if mode == "Historical Alerts" else "Active"} Alerts</h3>', unsafe_allow_html=True)
 
-    # --- COLOR MAP FOR ALERT SEVERITY ---
+    # Color map for alert severity
     color_map = config.SEVERITY_COLORS
     severity_weight = config.SEVERITY_WEIGHTS
 
-    # --- SUMMARY STATISTICS ---
+    # Summary statistics
     total_alerts = len(filtered_alerts)
     avg_severity = 0
     if total_alerts > 0:
@@ -2535,7 +2535,7 @@ elif mode in ["Live Alerts", "Historical Alerts"]:
     for state, count in top_states:
         col_stats3.write(f"- {state}: {count}")
 
-    # --- IMPROVED SEVERITY VISUALIZATION ---
+    # Improved severity visualization
     if total_alerts > 0:
         st.markdown('<h3 class="subsection-header">📊 Alert Analysis Dashboard</h3>', unsafe_allow_html=True)
         
@@ -2613,7 +2613,7 @@ elif mode in ["Live Alerts", "Historical Alerts"]:
                 st.markdown(f"- **Last Updated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
                 st.markdown(f"- **Auto-refresh:** Every 5 minutes")
 
-    # --- FILTER ALERTS BY ZIP CODE (if entered) ---
+    # Filter alerts by ZIP code (if entered)
     nearby_alerts = []
     user_lat = None
     user_lon = None
@@ -2660,7 +2660,7 @@ elif mode in ["Live Alerts", "Historical Alerts"]:
             else:
                 st.markdown('<div class="info-box"><p class="large-text">ℹ️ No alerts near your location.</p></div>', unsafe_allow_html=True)
 
-    # --- LAYOUT WITH COLUMNS ---
+    # Layout with columns
     col1, col2 = st.columns([2, 3])
 
     with col1:
@@ -2737,7 +2737,7 @@ elif mode in ["Live Alerts", "Historical Alerts"]:
                     )
                 ).add_to(m)
 
-        # --- Add heatmap layer ---
+        # Add heatmap layer
         heat_data = []
         for alert in filtered_alerts:
             geom = alert.get("geometry")
