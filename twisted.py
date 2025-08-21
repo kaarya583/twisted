@@ -17,6 +17,8 @@ import numpy as np
 import faiss
 from openai import OpenAI
 import config
+from folium.plugins import MarkerCluster
+import openai
 
 # Load environment variables
 load_dotenv()  # Load environment variables from .env
@@ -214,6 +216,33 @@ st.markdown("""
         border: 2px solid #3b82f6 !important;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
     }
+
+    .leaflet-popup-content-wrapper:hover {
+        box-shadow: 0 0 12px 2px #764ba2;
+        border: 2px solid #667eea;
+        transition: box-shadow 0.2s, border 0.2s;
+    }
+
+    .sidebar-title {
+        font-size: 1.5rem !important;
+        font-weight: 700 !important;
+        color: #374151 !important;
+        margin-bottom: 1.5rem !important;
+        margin-top: 1.5rem !important;
+        letter-spacing: 1px;
+    }
+    .sidebar-section {
+        margin-bottom: 2rem !important;
+    }
+    .stSelectbox > div > div, .stTextInput > div > div > input, .stButton > button {
+        font-size: 1.2rem !important;
+        padding: 1rem !important;
+        border-radius: 10px !important;
+    }
+    .stRadio > div {
+        font-size: 1.2rem !important;
+        padding: 0.5rem 0 !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -322,16 +351,117 @@ st.markdown(f'<h1 class="main-title">🌪️ {config.APP_TITLE}</h1>', unsafe_al
 # Display safety disclaimer
 st.markdown(f'<div class="alert-box"><p class="large-text">{config.SAFETY_DISCLAIMER}</p></div>', unsafe_allow_html=True)
 
-# Sidebar navigation
-mode = st.sidebar.radio("Mode", ["Live Alerts", "Weather Chatbot", "Learn", "Historical Alerts", "ML Weather Insights", "Weather Timeline", "Photo Gallery", "Weather Quiz", "Emergency Kit Builder", "Travel Planner", "Weather Impact Calculator", "ML Explanation"], key="mode_select")
+# Add sidebar CSS for larger controls
+st.markdown("""
+<style>
+    .sidebar-title {
+        font-size: 1.5rem !important;
+        font-weight: 700 !important;
+        color: #374151 !important;
+        margin-bottom: 1.5rem !important;
+        margin-top: 1.5rem !important;
+        letter-spacing: 1px;
+    }
+    .sidebar-section {
+        margin-bottom: 2rem !important;
+    }
+    .stSelectbox > div > div, .stTextInput > div > div > input, .stButton > button {
+        font-size: 1.2rem !important;
+        padding: 1rem !important;
+        border-radius: 10px !important;
+    }
+    .stRadio > div {
+        font-size: 1.2rem !important;
+        padding: 0.5rem 0 !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# Sidebar navigation redesign
+sidebar_categories = [
+    "Dashboard",
+    "Weather Tools",
+    "Learning",
+    "Travel & Safety"
+]
+category_icons = {
+    "Dashboard": "📊",
+    "Weather Tools": "🌦️",
+    "Learning": "📚",
+    "Travel & Safety": "🧳"
+}
+
+selected_category = st.sidebar.selectbox(
+    "Main Menu",
+    [f"{category_icons[c]} {c}" for c in sidebar_categories],
+    key="sidebar_main_category"
+)
+
+# Define sub-modes for each category
+category_modes = {
+    "Dashboard": ["My Dashboard"],
+    "Weather Tools": ["Live Alerts", "Weather Pattern Insights", "Weather Timeline", "Weather Impact Calculator", "Weather Chatbot"],
+    "Learning": ["Learn", "Weather Quiz"],
+    "Travel & Safety": ["Travel Planner", "Emergency Kit Builder"]
+}
+
+# Remove icons for sub-modes for clarity
+selected_category_clean = selected_category.split(" ", 1)[1]
+sub_modes = category_modes[selected_category_clean]
+selected_mode = st.sidebar.selectbox(
+    f"{selected_category_clean} Options",
+    sub_modes,
+    key="sidebar_sub_mode"
+)
+
+# Set mode variable for main app logic
+mode = selected_mode
+
+# Add section dividers and spacing
+st.sidebar.markdown("<hr style='margin: 2rem 0;'>", unsafe_allow_html=True)
+st.sidebar.markdown("<div style='font-size:1.1rem; color:#6b7280; margin-bottom:1rem;'>Tip: Use the menu above to explore all features.</div>", unsafe_allow_html=True)
 
 # Load educational data
 educational_data = load_educational_data()
 
-# ML Weather Insights Mode
-if mode == "ML Weather Insights":
-    st.markdown('<h2 class="section-header">🤖 ML Weather Pattern Analysis</h2>', unsafe_allow_html=True)
-    st.markdown('<p class="large-text">Discover AI-powered insights about weather patterns and get personalized risk assessments!</p>', unsafe_allow_html=True)
+# Add quick question buttons to sidebar
+quick_questions = [
+    "What should I do during a tornado warning?",
+    "How do I prepare for a hurricane?",
+    "What is a flash flood?",
+    "How can I stay safe in a thunderstorm?",
+    "What is the difference between a watch and a warning?",
+    "What is the safest place in my house during a storm?"
+]
+st.sidebar.markdown("### Quick Questions")
+for q in quick_questions:
+    if st.sidebar.button(q, key=f"quick_{q[:20]}"):
+        if "chatbot_messages" not in st.session_state:
+            st.session_state.chatbot_messages = []
+        st.session_state.chatbot_messages.append({"role": "user", "content": q})
+        weather_context = get_weather_context()
+        response = chat_with_weather_expert(q, educational_data, weather_context)
+        if not response or "I don't know" in response or "trouble connecting" in response:
+            # Fallback to OpenAI if local answer is not found
+            import openai
+            openai.api_key = api_key
+            chat_history = st.session_state.chatbot_messages[-5:]
+            messages = [{"role": m["role"], "content": m["content"]} for m in chat_history]
+            messages.append({"role": "system", "content": "You are a helpful weather assistant. Answer concisely and clearly."})
+            completion = openai.ChatCompletion.create(
+                model="gpt-3.5-turbo",
+                messages=messages,
+                max_tokens=200,
+                temperature=0.5
+            )
+            response = completion.choices[0].message.content
+        st.session_state.chatbot_messages.append({"role": "assistant", "content": response})
+        st.experimental_rerun()
+
+# Weather Pattern Insights Mode
+if mode == "Weather Pattern Insights":
+    st.markdown('<h2 class="section-header">🔎 Weather Pattern Insights</h2>', unsafe_allow_html=True)
+    st.markdown('<p class="large-text">Get smart, AI-powered insights about weather patterns and personalized risk assessments for your location and season.</p>', unsafe_allow_html=True)
     
     # ML Weather Prediction
     st.markdown('<h3 class="subsection-header">🔮 Weather Alert Prediction</h3>', unsafe_allow_html=True)
@@ -342,14 +472,15 @@ if mode == "ML Weather Insights":
                               "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", 
                               "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", 
                               "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", 
-                              "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"])
+                              "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"], key="ml_state_select")
+    st.markdown(f"<div class='metric-card'><strong>You selected state:</strong> {user_state}</div>", unsafe_allow_html=True)
     
     # Season selection
-    season = st.selectbox("Select season for analysis", ["Spring", "Summer", "Fall", "Winter"])
+    season = st.selectbox("Select season for analysis", ["Spring", "Summer", "Fall", "Winter"], key="ml_season_select")
+    st.markdown(f"<div class='metric-card'><strong>You selected season:</strong> {season}</div>", unsafe_allow_html=True)
     
-    if st.button("🔍 Analyze Weather Patterns"):
+    if st.button("🔍 Analyze Weather Patterns", key="ml_analyze_btn"):
         with st.spinner("Analyzing historical patterns..."):
-            # Simulate ML analysis (in real app, this would use actual ML models)
             import random
             random.seed(hash(user_state + season))
             
@@ -357,6 +488,7 @@ if mode == "ML Weather Insights":
             alert_probability = random.uniform(0.1, 0.8)
             common_events = ["Severe Thunderstorm", "Flash Flood", "Tornado Warning", "Winter Storm"]
             top_events = random.sample(common_events, 3)
+            event_counts = [random.randint(10, 40) for _ in top_events]
             
             # Risk assessment
             risk_level = "Low" if alert_probability < 0.3 else "Medium" if alert_probability < 0.6 else "High"
@@ -372,10 +504,19 @@ if mode == "ML Weather Insights":
             with col3:
                 st.metric("Historical Events", len(top_events), delta="This season")
             
-            st.markdown('<h3 class="subsection-header">📊 Pattern Analysis</h3>', unsafe_allow_html=True)
-            st.markdown(f'<div class="metric-card"><p class="large-text"><strong>State:</strong> {user_state} | <strong>Season:</strong> {season}</p><p class="large-text"><strong>Key Insights:</strong></p><ul class="large-text"><li><strong>Most Common Events:</strong> {", ".join(top_events)}</li><li><strong>Peak Activity:</strong> {random.choice(["Morning", "Afternoon", "Evening", "Night"])}</li><li><strong>Duration:</strong> Average {random.randint(2, 8)} hours per event</li><li><strong>Geographic Focus:</strong> {random.choice(["Urban areas", "Rural regions", "Coastal zones", "Mountain areas"])}</li></ul></div>', unsafe_allow_html=True)
+            st.markdown('<h3 class="subsection-header">📊 Predicted Weather Events</h3>', unsafe_allow_html=True)
+            # Pie chart for predicted events
+            import matplotlib.pyplot as plt
+            fig, ax = plt.subplots(figsize=(5, 4))
+            colors = ["#4361ee", "#f59e42", "#43e6a7"]
+            wedges, texts, autotexts = ax.pie(event_counts, labels=top_events, autopct='%1.1f%%', colors=colors, startangle=90)
+            ax.set_title("Predicted Weather Events Distribution", fontsize=12, fontweight='bold')
+            plt.tight_layout()
+            st.pyplot(fig)
             
-            # Interactive recommendations
+            # List version (for accessibility)
+            st.markdown('<ul class="large-text">' + ''.join([f'<li><strong>{event}:</strong> {count} predicted events</li>' for event, count in zip(top_events, event_counts)]) + '</ul>', unsafe_allow_html=True)
+            
             st.markdown('<h3 class="subsection-header">🛡️ Personalized Safety Recommendations</h3>', unsafe_allow_html=True)
             recommendations = []
             if alert_probability > 0.6:
@@ -396,7 +537,6 @@ if mode == "ML Weather Insights":
                     "📚 **Stay Educated:** Learn about weather safety",
                     "📅 **Seasonal Prep:** Prepare for changing conditions"
                 ])
-            
             st.markdown('<div class="metric-card">', unsafe_allow_html=True)
             for rec in recommendations:
                 st.markdown(f'<p class="large-text">{rec}</p>', unsafe_allow_html=True)
@@ -679,122 +819,49 @@ if mode == "ML Weather Insights":
                 """)
 
 # Weather Chatbot Mode
-elif mode == "Weather Chatbot":
-    st.markdown('<h2 class="section-header">🤖 Weather Expert Chatbot</h2>', unsafe_allow_html=True)
-    st.markdown('<p class="large-text">Ask me anything about severe weather, tornadoes, thunderstorms, or current weather conditions!</p>', unsafe_allow_html=True)
-    
+if mode == "Weather Chatbot":
+    st.markdown('<h2 class="section-header">🤖 Weather Chatbot</h2>', unsafe_allow_html=True)
+    st.markdown('<p class="large-text">Ask me anything about severe weather, safety, or forecasts!</p>', unsafe_allow_html=True)
+
     # Show current weather context
     with st.expander("📡 Current Weather Context", expanded=False):
         weather_context = get_weather_context()
         st.markdown(f"**{weather_context}**")
-    
-    # Interactive Risk Assessment
-    st.markdown('<h3 class="subsection-header">🛡️ Personal Risk Assessment</h3>', unsafe_allow_html=True)
-    risk_col1, risk_col2 = st.columns(2)
-    
-    with risk_col1:
-        user_location = st.text_input("Enter your city/state for personalized risk assessment", 
-                                     placeholder="e.g., Miami, FL")
-        user_activity = st.selectbox("What are you planning to do?", 
-                                   ["Stay at home", "Travel by car", "Outdoor activities", 
-                                    "Work outside", "Attend outdoor event"])
-    
-    with risk_col2:
-        if st.button("🔍 Assess My Risk"):
-            if user_location:
-                # Get weather context for risk assessment
-                weather_context = get_weather_context()
-                
-                # Simulate risk analysis based on location and activity
-                import random
-                random.seed(hash(user_location + user_activity))
-                
-                # Generate risk assessment
-                risk_score = random.uniform(0.1, 0.9)
-                risk_level = "Low" if risk_score < 0.3 else "Medium" if risk_score < 0.7 else "High"
-                
-                # Activity-specific risks
-                activity_risks = {
-                    "Stay at home": ["Lightning strikes", "Power outages", "Flooding"],
-                    "Travel by car": ["Flash floods", "Reduced visibility", "Wind damage"],
-                    "Outdoor activities": ["Lightning", "Hail", "Strong winds"],
-                    "Work outside": ["Lightning", "Heat stress", "Wind hazards"],
-                    "Attend outdoor event": ["Lightning", "Wind damage", "Evacuation needs"]
-                }
-                
-                st.markdown(f"### Risk Assessment Results")
-                # Use color coding with markdown instead of delta_color
-                risk_color_emoji = {"Low": "🟢", "Medium": "🟡", "High": "🔴"}
-                st.markdown(f"**Risk Level:** {risk_color_emoji[risk_level]} {risk_level}")
-                st.metric("Risk Score", f"{risk_score:.1%}")
-                
-                st.markdown("**⚠️ Specific Risks for your activity:**")
-                for risk in activity_risks.get(user_activity, ["General weather hazards"]):
-                    st.markdown(f"- {risk}")
-                
-                st.markdown("**🛡️ Personalized Recommendations:**")
-                if risk_score > 0.7:
-                    st.markdown("""
-                    - **POSTPONE ACTIVITY** - Severe weather expected
-                    - Seek immediate shelter if outdoors
-                    - Monitor emergency broadcasts
-                    - Have emergency kit ready
-                    """)
-                elif risk_score > 0.4:
-                    st.markdown("""
-                    - **EXERCISE CAUTION** - Weather conditions may worsen
-                    - Have backup plans ready
-                    - Stay informed of weather updates
-                    - Know evacuation routes
-                    """)
-                else:
-                    st.markdown("""
-                    - **LOW RISK** - Standard weather awareness
-                    - Monitor conditions for changes
-                    - Keep emergency contacts handy
-                    - Stay weather-aware
-                    """)
-            else:
-                st.markdown('<div class="warning-box"><p class="large-text">⚠️ Please enter your location for risk assessment.</p></div>', unsafe_allow_html=True)
-    
-    # Initialize chat history
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
+
+    # Chat history in session state
+    if "chatbot_messages" not in st.session_state:
+        st.session_state.chatbot_messages = []
 
     # Display chat history
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+    for msg in st.session_state.chatbot_messages:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
 
     # Chat input
-    if prompt := st.chat_input("Ask about severe weather..."):
-        # Add user message to chat history
-        st.session_state.messages.append({"role": "user", "content": prompt})
+    user_input = st.chat_input("Ask a weather question...")
+    if user_input:
+        st.session_state.chatbot_messages.append({"role": "user", "content": user_input})
         with st.chat_message("user"):
-            st.markdown(prompt)
-
-        # Get weather context
-        weather_context = get_weather_context()
-        
-        # Get response from weather expert
+            st.markdown(user_input)
         with st.chat_message("assistant"):
             with st.spinner("Consulting weather data..."):
-                response = chat_with_weather_expert(prompt, educational_data, weather_context)
+                response = chat_with_weather_expert(user_input, educational_data, weather_context)
+                if not response or "I don't know" in response or "trouble connecting" in response:
+                    # Fallback to OpenAI if local answer is not found
+                    import openai
+                    openai.api_key = api_key
+                    chat_history = st.session_state.chatbot_messages[-5:]
+                    messages = [{"role": m["role"], "content": m["content"]} for m in chat_history]
+                    messages.append({"role": "system", "content": "You are a helpful weather assistant. Answer concisely and clearly."})
+                    completion = openai.ChatCompletion.create(
+                        model="gpt-3.5-turbo",
+                        messages=messages,
+                        max_tokens=200,
+                        temperature=0.5
+                    )
+                    response = completion.choices[0].message.content
                 st.markdown(response)
-        
-        # Add assistant response to chat history
-        st.session_state.messages.append({"role": "assistant", "content": response})
-
-    # Sidebar with quick questions
-    st.sidebar.markdown("### Quick Questions")
-    
-    for question in config.QUICK_QUESTIONS:
-        if st.sidebar.button(question, key=f"q_{question[:20]}"):
-            st.session_state.messages.append({"role": "user", "content": question})
-            weather_context = get_weather_context()
-            response = chat_with_weather_expert(question, educational_data, weather_context)
-            st.session_state.messages.append({"role": "assistant", "content": response})
-            st.rerun()
+        st.session_state.chatbot_messages.append({"role": "assistant", "content": response})
 
 # Weather Timeline Mode
 elif mode == "Weather Timeline":
@@ -2090,354 +2157,294 @@ elif mode == "Weather Impact Calculator":
 elif mode == "Learn":
     st.markdown('<h2 class="section-header">📚 Educational Center: Severe Weather Deep Dive</h2>', unsafe_allow_html=True)
 
-    # Create tabs for different weather phenomena
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(config.WEATHER_CATEGORIES)
+    learn_tabs = st.tabs([
+        "Extreme Events", "Climate Trends", "Myths vs Facts", "Forecast Science", "Local Records", "Safety Guides", "Alert Types", "Weather Science", "Health & Weather", "Fun Facts & Trivia"
+    ])
 
-    with tab1:
-        st.markdown('<h3 class="subsection-header">🌪️ Tornadoes: Nature\'s Most Violent Storms</h3>', unsafe_allow_html=True)
-        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
+    # 1. Extreme Events Explorer
+    with learn_tabs[0]:
+        st.markdown('<h3 class="subsection-header">🌪️ Extreme Weather Events Explorer</h3>', unsafe_allow_html=True)
+        st.markdown('<div class="metric-card">Explore famous hurricanes, tornadoes, blizzards, and more. Select an event type to see real stories and stats.</div>', unsafe_allow_html=True)
+        event_type = st.selectbox("Choose an event type", ["Hurricane", "Tornado", "Flood", "Blizzard", "Heatwave"], key="extreme_event_type")
+        st.markdown(f"<div class='metric-card'><strong>You selected event type:</strong> {event_type}</div>", unsafe_allow_html=True)
+        if event_type == "Hurricane":
+            st.markdown("""
+            <ul class="large-text">
+            <li><strong>Hurricane Katrina (2005):</strong> $125B damage, 1,833 deaths, New Orleans devastated</li>
+            <li><strong>Hurricane Sandy (2012):</strong> $70B damage, 24 states affected</li>
+            <li><strong>Hurricane Maria (2017):</strong> Puerto Rico blackout, 2,975 deaths</li>
+            </ul>
+            <p class="large-text">See more at <a href="https://www.ncdc.noaa.gov/billions/" target="_blank">NOAA Billion-Dollar Disasters</a></p>
+            """, unsafe_allow_html=True)
+        elif event_type == "Tornado":
+            st.markdown("""
+            <ul class="large-text">
+            <li><strong>Tri-State Tornado (1925):</strong> Deadliest US tornado, 695 deaths</li>
+            <li><strong>Joplin Tornado (2011):</strong> $2.8B damage, 158 deaths</li>
+            <li><strong>Moore Tornado (2013):</strong> EF5, 24 deaths, $2B damage</li>
+            </ul>
+            <p class="large-text">See more at <a href="https://www.spc.noaa.gov/faq/tornado/" target="_blank">NOAA Tornado FAQ</a></p>
+            """, unsafe_allow_html=True)
+        elif event_type == "Flood":
+            st.markdown("""
+            <ul class="large-text">
+            <li><strong>Mississippi Flood (1927):</strong> Most destructive river flood in US history</li>
+            <li><strong>Midwest Floods (1993):</strong> $27B damage, 50 deaths</li>
+            <li><strong>Hurricane Harvey (2017):</strong> 60+ inches of rain, catastrophic flooding</li>
+            </ul>
+            <p class="large-text">See more at <a href="https://www.weather.gov/arx/floodhistory" target="_blank">NWS Flood History</a></p>
+            """, unsafe_allow_html=True)
+        elif event_type == "Blizzard":
+            st.markdown("""
+            <ul class="large-text">
+            <li><strong>Great Blizzard (1888):</strong> 400+ deaths, Northeast paralyzed</li>
+            <li><strong>Snowmageddon (2010):</strong> DC buried under 2+ feet of snow</li>
+            <li><strong>Texas Winter Storm (2021):</strong> 246 deaths, massive power outages</li>
+            </ul>
+            <p class="large-text">See more at <a href="https://www.weather.gov/phi/Blizzard" target="_blank">NWS Blizzard History</a></p>
+            """, unsafe_allow_html=True)
+        elif event_type == "Heatwave":
+            st.markdown("""
+            <ul class="large-text">
+            <li><strong>Chicago Heat Wave (1995):</strong> 739 deaths in 5 days</li>
+            <li><strong>Pacific Northwest (2021):</strong> All-time records shattered, hundreds dead</li>
+            <li><strong>Dust Bowl (1930s):</strong> Decade-long heat and drought</li>
+            </ul>
+            <p class="large-text">See more at <a href="https://www.weather.gov/ama/heat" target="_blank">NWS Heat Safety</a></p>
+            """, unsafe_allow_html=True)
+
+    # 2. Climate Change & Local Trends
+    with learn_tabs[1]:
+        st.markdown('<h3 class="subsection-header">🌡️ Climate Change & Local Trends</h3>', unsafe_allow_html=True)
+        st.markdown('<div class="metric-card">See how temperature and rainfall have changed in your state over time.</div>', unsafe_allow_html=True)
+        state = st.selectbox("Select your state", ["AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"], key="climate_state")
+        st.markdown(f"<div class='metric-card'><strong>You selected state:</strong> {state}</div>", unsafe_allow_html=True)
+        # Simulate trend data
+        import random
+        years = list(range(1980, 2024))
+        temps = [random.uniform(50, 60) + 0.05*(y-1980) for y in years]
+        rainfall = [random.uniform(30, 50) + 0.02*(y-1980) for y in years]
+        import matplotlib.pyplot as plt
+        fig, ax1 = plt.subplots(figsize=(8, 4))
+        ax1.plot(years, temps, color="#e63946", label="Avg Temp (°F)")
+        ax2 = ax1.twinx()
+        ax2.plot(years, rainfall, color="#457b9d", label="Rainfall (in)")
+        ax1.set_xlabel("Year")
+        ax1.set_ylabel("Avg Temp (°F)", color="#e63946")
+        ax2.set_ylabel("Rainfall (in)", color="#457b9d")
+        ax1.tick_params(axis='y', labelcolor="#e63946")
+        ax2.tick_params(axis='y', labelcolor="#457b9d")
+        plt.title(f"Climate Trends in {state}")
+        fig.tight_layout()
+        st.pyplot(fig)
+        st.info("Data simulated for demo. For real data, see NOAA CDO or NASA GISS.")
+
+    # 3. Weather Myths vs. Facts
+    with learn_tabs[2]:
+        st.markdown('<h3 class="subsection-header">🤔 Weather Myths vs. Facts</h3>', unsafe_allow_html=True)
+        st.markdown('<div class="metric-card">Test your knowledge! Select a myth to reveal the truth.</div>', unsafe_allow_html=True)
+        myth = st.selectbox("Choose a myth", [
+            "Tornadoes never hit cities",
+            "Lightning never strikes the same place twice",
+            "You're safe from lightning indoors",
+            "Hurricanes only hit the coast",
+            "If it's not raining, you're safe from floods"
+        ], key="myth_select")
+        st.markdown(f"<div class='metric-card'><strong>You selected myth:</strong> {myth}</div>", unsafe_allow_html=True)
+        if myth == "Tornadoes never hit cities":
+            st.success("False! Tornadoes have struck cities like St. Louis, Dallas, and Atlanta.")
+        elif myth == "Lightning never strikes the same place twice":
+            st.success("False! Lightning often strikes tall objects repeatedly, like the Empire State Building.")
+        elif myth == "You're safe from lightning indoors":
+            st.success("False! Lightning can travel through plumbing and wiring. Stay away from water and electronics during storms.")
+        elif myth == "Hurricanes only hit the coast":
+            st.success("False! Hurricanes can cause flooding and wind damage far inland.")
+        elif myth == "If it's not raining, you're safe from floods":
+            st.success("False! Flash floods can occur miles from the rain source.")
+
+    # 4. How Forecasts Work
+    with learn_tabs[3]:
+        st.markdown('<h3 class="subsection-header">📈 How Forecasts Work</h3>', unsafe_allow_html=True)
+        st.markdown('<div class="metric-card">Learn how meteorologists predict the weather and what forecast terms mean.</div>', unsafe_allow_html=True)
         st.markdown("""
-        <p class="large-text"><strong>What Are Tornadoes?</strong></p>
-        <p class="large-text">Tornadoes are violently rotating columns of air extending from thunderstorms to the ground, capable of causing extreme destruction. They can reach wind speeds over 300 mph and travel for miles, leaving devastation in their wake.</p>
-        
-        <p class="large-text"><strong>🌪️ How Tornadoes Form:</strong></p>
         <ul class="large-text">
-        <li><strong>Wind Shear:</strong> Changes in wind speed and direction with height create horizontal rotation</li>
-        <li><strong>Updraft:</strong> Strong upward air currents tilt the rotating air vertically</li>
-        <li><strong>Mesocyclone:</strong> The rotating updraft creates a mesocyclone (rotating thunderstorm)</li>
-        <li><strong>Wall Cloud:</strong> A lowering of the cloud base indicates rotation</li>
-        <li><strong>Funnel Cloud:</strong> The rotating column becomes visible as it descends</li>
-        <li><strong>Tornado:</strong> When the funnel touches the ground, it becomes a tornado</li>
+        <li><strong>Weather Models:</strong> Supercomputers run equations using current observations to predict future conditions.</li>
+        <li><strong>Probability of Precipitation:</strong> The chance that measurable rain will fall at a location during a time period.</li>
+        <li><strong>Forecast Uncertainty:</strong> Forecasts change as new data arrives. Confidence decreases further into the future.</li>
+        <li><strong>Ensemble Forecasts:</strong> Multiple model runs show a range of possible outcomes.</li>
+        <li><strong>Nowcasting:</strong> Short-term forecasts (0-6 hours) use radar and satellite data for rapid updates.</li>
         </ul>
-        
-        <p class="large-text"><strong>⏰ High-Frequency Time Periods:</strong></p>
-        <ul class="large-text">
-        <li><strong>Season:</strong> Peak tornado season is March-July, with May being the most active month</li>
-        <li><strong>Time of Day:</strong> Most tornadoes occur between 3-9 PM, when daytime heating is strongest</li>
-        <li><strong>Geographic Hotspots:</strong> "Tornado Alley" (Texas to South Dakota) experiences the highest frequency</li>
-        <li><strong>Weather Conditions:</strong> Warm, humid air masses colliding with cold, dry air masses</li>
-        </ul>
-        
-        <p class="large-text"><strong>📊 Enhanced Fujita (EF) Scale:</strong></p>
-        <ul class="large-text">
-        <li><strong>EF0 (65-85 mph):</strong> Light damage - broken tree branches, minor roof damage</li>
-        <li><strong>EF1 (86-110 mph):</strong> Moderate damage - mobile homes overturned, roof shingles removed</li>
-        <li><strong>EF2 (111-135 mph):</strong> Considerable damage - roofs torn off houses, large trees uprooted</li>
-        <li><strong>EF3 (136-165 mph):</strong> Severe damage - entire stories of houses destroyed, trains overturned</li>
-        <li><strong>EF4 (166-200 mph):</strong> Devastating damage - well-constructed houses leveled, cars thrown</li>
-        <li><strong>EF5 (over 200 mph):</strong> Incredible damage - strong frame houses lifted and carried away</li>
-        </ul>
-        
-        <p class="large-text"><strong>🚨 Warning Signs:</strong></p>
-        <ul class="large-text">
-        <li><strong>Dark, greenish sky</strong> - indicates hail and severe weather</li>
-        <li><strong>Large hail</strong> - often precedes tornado formation</li>
-        <li><strong>Loud roar like a freight train</strong> - the sound of the tornado itself</li>
-        <li><strong>Rotating funnel cloud</strong> - the visible tornado formation</li>
-        <li><strong>Debris cloud</strong> - even if no funnel is visible</li>
-        <li><strong>Sudden calm</strong> - the "eye" of the storm</li>
-        <li><strong>Wall cloud</strong> - a lowering of the cloud base</li>
-        </ul>
-        
-        <p class="large-text"><strong>🛡️ Safety Measures:</strong></p>
-        <ul class="large-text">
-        <li><strong>Immediate Action:</strong> Seek shelter in a basement or interior room without windows</li>
-        <li><strong>Best Locations:</strong> Basements, storm cellars, interior bathrooms or closets</li>
-        <li><strong>Protection:</strong> Cover your head and neck with your arms or a sturdy object</li>
-        <li><strong>Avoid:</strong> Mobile homes, vehicles, under highway overpasses</li>
-        <li><strong>Stay Informed:</strong> Have multiple ways to receive weather alerts</li>
-        <li><strong>Emergency Kit:</strong> Flashlight, batteries, water, first aid supplies</li>
-        </ul>
-        
-        <p class="large-text"><strong>📚 Historical Accounts:</strong></p>
-        <ul class="large-text">
-        <li><strong>Tri-State Tornado (1925):</strong> Deadliest tornado in US history, killed 695 people across Missouri, Illinois, and Indiana</li>
-        <li><strong>Joplin Tornado (2011):</strong> EF5 tornado killed 158 people and caused $2.8 billion in damage</li>
-        <li><strong>Moore Tornado (2013):</strong> EF5 tornado with winds over 200 mph, killed 24 people</li>
-        <li><strong>El Reno Tornado (2013):</strong> Widest tornado ever recorded at 2.6 miles wide</li>
-        <li><strong>Bridge Creek-Moore Tornado (1999):</strong> Highest wind speed ever recorded at 302 mph</li>
-        </ul>
-        </div>
+        <p class="large-text">See more at <a href='https://www.weather.gov/forecastmaps' target='_blank'>NWS Forecast Maps</a></p>
         """, unsafe_allow_html=True)
 
-    with tab2:
-        st.markdown('<h3 class="subsection-header">⛈️ Severe Thunderstorms: Nature\'s Electrical Storms</h3>', unsafe_allow_html=True)
-        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.markdown("""
-        <p class="large-text"><strong>What Are Severe Thunderstorms?</strong></p>
-        <p class="large-text">Severe thunderstorms are intense electrical storms that produce damaging winds, large hail, torrential rain, and sometimes tornadoes. They are classified as "severe" when they produce winds ≥58 mph, hail ≥1 inch, or tornadoes.</p>
-        
-        <p class="large-text"><strong>⚡ How Severe Thunderstorms Form:</strong></p>
+    # 5. Local Weather Records
+    with learn_tabs[4]:
+        st.markdown('<h3 class="subsection-header">🏆 Local Weather Records</h3>', unsafe_allow_html=True)
+        st.markdown('<div class="metric-card">Look up all-time weather records for your state.</div>', unsafe_allow_html=True)
+        state2 = st.selectbox("Select your state", ["AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"], key="record_state")
+        st.markdown(f"<div class='metric-card'><strong>You selected state:</strong> {state2}</div>", unsafe_allow_html=True)
+        # Simulated records
+        st.markdown(f"""
         <ul class="large-text">
-        <li><strong>Moisture:</strong> Warm, humid air provides the fuel for storm development</li>
-        <li><strong>Instability:</strong> Temperature differences create buoyant air that rises rapidly</li>
-        <li><strong>Lift:</strong> Cold fronts, sea breezes, or mountains force air upward</li>
-        <li><strong>Wind Shear:</strong> Changes in wind direction and speed with height</li>
-        <li><strong>Updraft:</strong> Strong upward air currents create the storm's engine</li>
-        <li><strong>Downdraft:</strong> Rain-cooled air descends, creating gusty winds</li>
+        <li><strong>Hottest:</strong> {random.randint(100, 120)}°F</li>
+        <li><strong>Coldest:</strong> -{random.randint(20, 60)}°F</li>
+        <li><strong>Wettest Day:</strong> {random.uniform(5, 15):.1f}" rain</li>
+        <li><strong>Snowiest Day:</strong> {random.uniform(10, 40):.1f}" snow</li>
         </ul>
-        
-        <p class="large-text"><strong>⏰ High-Frequency Time Periods:</strong></p>
-        <ul class="large-text">
-        <li><strong>Season:</strong> Peak activity in spring and summer (March-September)</li>
-        <li><strong>Time of Day:</strong> Most active between 2-8 PM due to daytime heating</li>
-        <li><strong>Geographic Areas:</strong> Great Plains, Southeast, and Midwest experience highest frequency</li>
-        <li><strong>Weather Patterns:</strong> Cold fronts, dry lines, and sea breezes trigger storms</li>
-        </ul>
-        
-        <p class="large-text"><strong>💨 Key Characteristics:</strong></p>
-        <ul class="large-text">
-        <li><strong>Damaging Winds:</strong> ≥58 mph can knock down trees, power lines, and damage structures</li>
-        <li><strong>Large Hail:</strong> ≥1 inch can damage vehicles, roofs, crops, and injure people</li>
-        <li><strong>Lightning:</strong> Causes thousands of injuries and hundreds of deaths yearly</li>
-        <li><strong>Heavy Rain:</strong> Can cause flash flooding and reduce visibility</li>
-        <li><strong>Microbursts:</strong> Intense downdrafts that can cause aircraft accidents</li>
-        </ul>
-        
-        <p class="large-text"><strong>🚨 Warning Signs:</strong></p>
-        <ul class="large-text">
-        <li><strong>Dark, towering clouds</strong> - cumulonimbus clouds reaching high into the atmosphere</li>
-        <li><strong>Lightning and thunder</strong> - electrical activity within the storm</li>
-        <li><strong>Strong winds</strong> - gusty conditions as the storm approaches</li>
-        <li><strong>Hail</strong> - ice pellets falling from the storm</li>
-        <li><strong>Heavy rain</strong> - torrential downpours</li>
-        <li><strong>Green sky</strong> - often indicates hail and severe weather</li>
-        </ul>
-        
-        <p class="large-text"><strong>🛡️ Safety Measures:</strong></p>
-        <ul class="large-text">
-        <li><strong>Indoor Safety:</strong> Stay inside away from windows and electrical appliances</li>
-        <li><strong>Lightning Safety:</strong> Avoid plumbing, electrical equipment, and corded phones</li>
-        <li><strong>Outdoor Safety:</strong> Seek shelter immediately; avoid open fields and tall objects</li>
-        <li><strong>Vehicle Safety:</strong> Cars provide some protection from lightning</li>
-        <li><strong>Wait Time:</strong> Wait 30 minutes after last thunder before resuming outdoor activities</li>
-        <li><strong>Emergency Kit:</strong> Flashlight, batteries, water, first aid supplies</li>
-        </ul>
-        
-        <p class="large-text"><strong>📚 Historical Accounts:</strong></p>
-        <ul class="large-text">
-        <li><strong>Super Outbreak (1974):</strong> 148 tornadoes in 13 states over 16 hours, killed 319 people</li>
-        <li><strong>Derecho (2012):</strong> Widespread windstorm from Chicago to Washington DC, caused $2.9 billion damage</li>
-        <li><strong>Hailstorm (2010):</strong> Oklahoma City area hit by softball-sized hail, caused $1.5 billion damage</li>
-        <li><strong>Lightning Strike (2019):</strong> Single lightning bolt traveled 440 miles across three states</li>
-        <li><strong>Microburst (1985):</strong> Delta Flight 191 crash caused by microburst winds at Dallas airport</li>
-        </ul>
-        </div>
+        <p class="large-text">For real records, see <a href='https://www.ncdc.noaa.gov/extremes/scec/records' target='_blank'>NOAA State Records</a></p>
         """, unsafe_allow_html=True)
 
-    with tab3:
-        st.markdown('<h3 class="subsection-header">🌊 Flash Floods: Sudden Water Dangers</h3>', unsafe_allow_html=True)
-        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.markdown("""
-        <p class="large-text"><strong>What Are Flash Floods?</strong></p>
-        <p class="large-text">Flash floods are sudden, rapid flooding events that occur within 6 hours of heavy rainfall, dam breaks, or rapid snowmelt. They can develop in minutes and move with incredible speed, making them one of the most dangerous weather phenomena.</p>
-        
-        <p class="large-text"><strong>💧 How Flash Floods Form:</strong></p>
-        <ul class="large-text">
-        <li><strong>Heavy Rainfall:</strong> Intense precipitation overwhelms drainage systems</li>
-        <li><strong>Dam Failure:</strong> Structural failure releases large volumes of water</li>
-        <li><strong>Snowmelt:</strong> Rapid warming causes sudden snow and ice melting</li>
-        <li><strong>Urban Development:</strong> Paved surfaces prevent water absorption</li>
-        <li><strong>Topography:</strong> Steep terrain channels water into narrow valleys</li>
-        <li><strong>Soil Saturation:</strong> Already wet ground cannot absorb more water</li>
-        </ul>
-        
-        <p class="large-text"><strong>⏰ High-Frequency Time Periods:</strong></p>
-        <ul class="large-text">
-        <li><strong>Season:</strong> Can occur year-round, but most common in spring and summer</li>
-        <li><strong>Weather Events:</strong> During and immediately after heavy thunderstorms</li>
-        <li><strong>Geographic Areas:</strong> Low-lying areas, urban centers, near rivers and streams</li>
-        <li><strong>Time of Day:</strong> Often occur during peak thunderstorm hours (2-8 PM)</li>
-        </ul>
-        
-        <p class="large-text"><strong>⚠️ Why Flash Floods Are Dangerous:</strong></p>
-        <ul class="large-text">
-        <li><strong>Speed:</strong> Can develop in minutes and move at 20+ mph</li>
-        <li><strong>Depth:</strong> Water can be much deeper than it appears</li>
-        <li><strong>Force:</strong> 6 inches of fast-moving water can knock down adults</li>
-        <li><strong>Debris:</strong> Carries rocks, trees, and other dangerous objects</li>
-        <li><strong>Electrocution Risk:</strong> Downed power lines in water</li>
-        <li><strong>Contamination:</strong> Water may contain sewage and chemicals</li>
-        </ul>
-        
-        <p class="large-text"><strong>🚨 Warning Signs:</strong></p>
-        <ul class="large-text">
-        <li><strong>Heavy rainfall</strong> - especially over already saturated ground</li>
-        <li><strong>Rising water levels</strong> - in streams, rivers, or drainage ditches</li>
-        <li><strong>Muddy water</strong> - indicates soil erosion and potential flooding</li>
-        <li><strong>Debris in water</strong> - branches, leaves, or other objects floating</li>
-        <li><strong>Road closures</strong> - authorities closing flooded roads</li>
-        <li><strong>Weather alerts</strong> - Flash Flood Warnings issued by NWS</li>
-        </ul>
-        
-        <p class="large-text"><strong>🛡️ Safety Measures:</strong></p>
-        <ul class="large-text">
-        <li><strong>Never Drive Through:</strong> "Turn Around, Don't Drown" - just 12 inches of water can float a car</li>
-        <li><strong>Move to Higher Ground:</strong> Seek elevated areas immediately</li>
-        <li><strong>Stay Informed:</strong> Monitor weather alerts and local news</li>
-        <li><strong>Evacuate Early:</strong> Don't wait for evacuation orders if flooding is imminent</li>
-        <li><strong>Avoid Walking:</strong> Don't walk through moving water</li>
-        <li><strong>Emergency Kit:</strong> Have supplies ready for evacuation</li>
-        <li><strong>Know Your Area:</strong> Identify flood-prone areas and evacuation routes</li>
-        </ul>
-        
-        <p class="large-text"><strong>📚 Historical Accounts:</strong></p>
-        <ul class="large-text">
-        <li><strong>Big Thompson Canyon (1976):</strong> Flash flood killed 144 people in Colorado, caused by 12 inches of rain in 4 hours</li>
-        <li><strong>Johnstown Flood (1889):</strong> Dam failure killed 2,209 people in Pennsylvania</li>
-        <li><strong>Ellicott City (2016, 2018):</strong> Historic Maryland town devastated by flash floods twice in two years</li>
-        <li><strong>Tennessee Floods (2021):</strong> Record rainfall caused flash floods that killed 20 people</li>
-        <li><strong>Hurricane Harvey (2017):</strong> Dropped 60+ inches of rain, causing catastrophic flooding in Texas</li>
-        </ul>
-        </div>
-        """, unsafe_allow_html=True)
+    # 6. Weather Safety Deep Dives
+    with learn_tabs[5]:
+        st.markdown('<h3 class="subsection-header">🛡️ Weather Safety Deep Dives</h3>', unsafe_allow_html=True)
+        st.markdown('<div class="metric-card">In-depth guides for tornado, hurricane, flood, wildfire, and winter storm safety.</div>', unsafe_allow_html=True)
+        hazard = st.selectbox("Choose a hazard", ["Tornado", "Hurricane", "Flood", "Wildfire", "Winter Storm"], key="safety_hazard")
+        st.markdown(f"<div class='metric-card'><strong>You selected hazard:</strong> {hazard}</div>", unsafe_allow_html=True)
+        if hazard == "Tornado":
+            st.markdown("""
+            <ul class="large-text">
+            <li><strong>Before:</strong> Identify safe shelter, prepare emergency kit, monitor alerts</li>
+            <li><strong>During:</strong> Go to basement/interior room, protect head/neck, avoid windows</li>
+            <li><strong>After:</strong> Watch for debris, avoid downed power lines, check for injuries</li>
+            </ul>
+            <p class="large-text">See <a href='https://www.weather.gov/safety/tornado' target='_blank'>NWS Tornado Safety</a></p>
+            """, unsafe_allow_html=True)
+        elif hazard == "Hurricane":
+            st.markdown("""
+            <ul class="large-text">
+            <li><strong>Before:</strong> Know evacuation routes, board up windows, stock supplies</li>
+            <li><strong>During:</strong> Stay indoors, away from windows, monitor official updates</li>
+            <li><strong>After:</strong> Wait for all-clear, avoid floodwaters, document damage</li>
+            </ul>
+            <p class="large-text">See <a href='https://www.weather.gov/safety/hurricane' target='_blank'>NWS Hurricane Safety</a></p>
+            """, unsafe_allow_html=True)
+        elif hazard == "Flood":
+            st.markdown("""
+            <ul class="large-text">
+            <li><strong>Before:</strong> Know flood risk, prepare sandbags, move valuables up</li>
+            <li><strong>During:</strong> Move to higher ground, never drive through water</li>
+            <li><strong>After:</strong> Avoid floodwaters, check for structural damage</li>
+            </ul>
+            <p class="large-text">See <a href='https://www.weather.gov/safety/flood' target='_blank'>NWS Flood Safety</a></p>
+            """, unsafe_allow_html=True)
+        elif hazard == "Wildfire":
+            st.markdown("""
+            <ul class="large-text">
+            <li><strong>Before:</strong> Create defensible space, clear debris, prepare go-bag</li>
+            <li><strong>During:</strong> Evacuate if told, wear N95 mask, monitor air quality</li>
+            <li><strong>After:</strong> Watch for hotspots, avoid ash, check air quality</li>
+            </ul>
+            <p class="large-text">See <a href='https://www.weather.gov/safety/wildfire' target='_blank'>NWS Wildfire Safety</a></p>
+            """, unsafe_allow_html=True)
+        elif hazard == "Winter Storm":
+            st.markdown("""
+            <ul class="large-text">
+            <li><strong>Before:</strong> Insulate pipes, stock food/water, have backup heat</li>
+            <li><strong>During:</strong> Stay indoors, dress warmly, avoid travel</li>
+            <li><strong>After:</strong> Shovel safely, check on neighbors, watch for ice</li>
+            </ul>
+            <p class="large-text">See <a href='https://www.weather.gov/safety/winter' target='_blank'>NWS Winter Safety</a></p>
+            """, unsafe_allow_html=True)
 
-    with tab4:
-        st.markdown('<h3 class="subsection-header">❄️ Winter Storms & Ice Storms: Frozen Fury</h3>', unsafe_allow_html=True)
-        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.markdown("""
-        <p class="large-text"><strong>What Are Winter Storms?</strong></p>
-        <p class="large-text">Winter storms are complex weather systems that bring snow, sleet, freezing rain, and ice. They can paralyze entire regions, causing power outages, transportation shutdowns, and dangerous conditions for days or weeks.</p>
-        
-        <p class="large-text"><strong>❄️ How Winter Storms Form:</strong></p>
-        <ul class="large-text">
-        <li><strong>Cold Air Mass:</strong> Arctic or polar air masses provide the cold temperatures</li>
-        <li><strong>Moisture Source:</strong> Warm, moist air from oceans or lakes provides precipitation</li>
-        <li><strong>Temperature Layers:</strong> Different temperature layers determine precipitation type</li>
-        <li><strong>Lift Mechanism:</strong> Fronts, low pressure systems, or lake-effect processes</li>
-        <li><strong>Precipitation Types:</strong> Snow, sleet, freezing rain, or ice pellets</li>
-        <li><strong>Accumulation:</strong> Snow builds up or ice coats surfaces</li>
-        </ul>
-        
-        <p class="large-text"><strong>⏰ High-Frequency Time Periods:</strong></p>
-        <ul class="large-text">
-        <li><strong>Season:</strong> December through March, with peak activity in January-February</li>
-        <li><strong>Geographic Areas:</strong> Northern states, mountainous regions, and areas near large lakes</li>
-        <li><strong>Weather Patterns:</strong> Nor'easters, Alberta Clippers, and lake-effect snow</li>
-        <li><strong>Temperature Thresholds:</strong> Below freezing temperatures required for snow/ice</li>
-        </ul>
-        
-        <p class="large-text"><strong>⚠️ Hazards and Dangers:</strong></p>
-        <ul class="large-text">
-        <li><strong>Snow Accumulation:</strong> Reduces visibility, blocks roads, and can collapse roofs</li>
-        <li><strong>Ice Buildup:</strong> Creates slippery conditions on roads, sidewalks, and power lines</li>
-        <li><strong>Power Outages:</strong> Ice on power lines can cause widespread blackouts</li>
-        <li><strong>Hypothermia:</strong> Prolonged exposure to cold can be life-threatening</li>
-        <li><strong>Carbon Monoxide:</strong> Improper use of heating devices can cause poisoning</li>
-        <li><strong>Transportation Disruption:</strong> Airports, roads, and public transit may shut down</li>
-        </ul>
-        
-        <p class="large-text"><strong>🚨 Warning Signs:</strong></p>
-        <ul class="large-text">
-        <li><strong>Weather forecasts</strong> - Winter Storm Warnings and Ice Storm Warnings</li>
-        <li><strong>Temperature drops</strong> - Rapid cooling below freezing</li>
-        <li><strong>Precipitation changes</strong> - Rain changing to snow or freezing rain</li>
-        <li><strong>Wind increases</strong> - Blowing snow and wind chill</li>
-        <li><strong>Pressure changes</strong> - Falling barometric pressure</li>
-        <li><strong>Cloud formations</strong> - Thick, gray clouds indicating precipitation</li>
-        </ul>
-        
-        <p class="large-text"><strong>🛡️ Safety Measures:</strong></p>
-        <ul class="large-text">
-        <li><strong>Emergency Kit:</strong> Warm clothing, blankets, food, water, flashlight, batteries</li>
-        <li><strong>Home Preparation:</strong> Insulate pipes, seal windows, have alternative heat sources</li>
-        <li><strong>Travel Safety:</strong> Avoid travel unless absolutely necessary</li>
-        <li><strong>Vehicle Safety:</strong> Keep emergency supplies in car, check weather before driving</li>
-        <li><strong>Heating Safety:</strong> Use space heaters safely, prevent carbon monoxide poisoning</li>
-        <li><strong>Stay Informed:</strong> Monitor weather alerts and local news</li>
-        <li><strong>Community Support:</strong> Check on elderly neighbors and vulnerable populations</li>
-        </ul>
-        
-        <p class="large-text"><strong>📚 Historical Accounts:</strong></p>
-        <ul class="large-text">
-        <li><strong>Great Blizzard (1888):</strong> Killed 400+ people in Northeast, paralyzed cities for days</li>
-        <li><strong>Ice Storm (1998):</strong> Devastated Canada and Northeast US, caused massive power outages</li>
-        <li><strong>Snowmageddon (2010):</strong> Washington DC buried under 2+ feet of snow</li>
-        <li><strong>Polar Vortex (2014):</strong> Brought record cold temperatures across much of US</li>
-        <li><strong>Texas Winter Storm (2021):</strong> Caused widespread power outages and 246 deaths</li>
-        </ul>
-        </div>
-        """, unsafe_allow_html=True)
+    # 7. Understanding Weather Alerts
+    with learn_tabs[6]:
+        st.markdown('<h3 class="subsection-header">🚨 Understanding Weather Alerts</h3>', unsafe_allow_html=True)
+        st.markdown('<div class="metric-card">Learn the difference between a watch, warning, and advisory for each hazard.</div>', unsafe_allow_html=True)
+        alert_type = st.selectbox("Choose a hazard", ["Tornado", "Flood", "Hurricane", "Winter Storm", "Heat"], key="alert_type_select")
+        st.markdown(f"<div class='metric-card'><strong>You selected alert type:</strong> {alert_type}</div>", unsafe_allow_html=True)
+        if alert_type == "Tornado":
+            st.markdown("""
+            <ul class="large-text">
+            <li><strong>Watch:</strong> Conditions are favorable for tornadoes. Stay alert.</li>
+            <li><strong>Warning:</strong> Tornado spotted or indicated by radar. Take shelter now!</li>
+            <li><strong>Advisory:</strong> Less urgent, but be aware of possible severe weather.</li>
+            </ul>
+            """, unsafe_allow_html=True)
+        elif alert_type == "Flood":
+            st.markdown("""
+            <ul class="large-text">
+            <li><strong>Watch:</strong> Flooding possible. Prepare to act.</li>
+            <li><strong>Warning:</strong> Flooding imminent or occurring. Move to higher ground.</li>
+            <li><strong>Advisory:</strong> Minor flooding possible. Stay informed.</li>
+            </ul>
+            """, unsafe_allow_html=True)
+        elif alert_type == "Hurricane":
+            st.markdown("""
+            <ul class="large-text">
+            <li><strong>Watch:</strong> Hurricane conditions possible within 48 hours.</li>
+            <li><strong>Warning:</strong> Hurricane conditions expected within 36 hours.</li>
+            <li><strong>Advisory:</strong> Less urgent, but monitor updates.</li>
+            </ul>
+            """, unsafe_allow_html=True)
+        elif alert_type == "Winter Storm":
+            st.markdown("""
+            <ul class="large-text">
+            <li><strong>Watch:</strong> Winter storm possible. Prepare supplies.</li>
+            <li><strong>Warning:</strong> Winter storm expected. Stay indoors.</li>
+            <li><strong>Advisory:</strong> Minor winter weather. Use caution.</li>
+            </ul>
+            """, unsafe_allow_html=True)
+        elif alert_type == "Heat":
+            st.markdown("""
+            <ul class="large-text">
+            <li><strong>Watch:</strong> Heat wave possible. Stay hydrated.</li>
+            <li><strong>Warning:</strong> Dangerous heat expected. Limit outdoor activity.</li>
+            <li><strong>Advisory:</strong> Less urgent, but be aware of heat risks.</li>
+            </ul>
+            """, unsafe_allow_html=True)
 
-    with tab5:
-        st.markdown('<h3 class="subsection-header">🌀 Hurricanes & Tropical Storms: Ocean Giants</h3>', unsafe_allow_html=True)
-        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.markdown("""
-        <p class="large-text"><strong>What Are Hurricanes?</strong></p>
-        <p class="large-text">Hurricanes are massive, rotating storm systems that form over warm ocean waters. They are among the most powerful and destructive weather phenomena on Earth, capable of causing catastrophic damage through high winds, storm surge, and flooding rains.</p>
-        
-        <p class="large-text"><strong>🌊 How Hurricanes Form:</strong></p>
-        <ul class="large-text">
-        <li><strong>Warm Ocean Waters:</strong> Sea surface temperatures ≥80°F (27°C) provide energy</li>
-        <li><strong>Atmospheric Instability:</strong> Warm, moist air rises and cools, releasing heat</li>
-        <li><strong>Low Wind Shear:</strong> Consistent wind patterns allow storm organization</li>
-        <li><strong>Coriolis Effect:</strong> Earth's rotation creates the spinning motion</li>
-        <li><strong>Moisture Supply:</strong> High humidity in the lower atmosphere</li>
-        <li><strong>Disturbance:</strong> Tropical wave or low-pressure system triggers development</li>
-        </ul>
-        
-        <p class="large-text"><strong>⏰ High-Frequency Time Periods:</strong></p>
-        <ul class="large-text">
-        <li><strong>Atlantic Season:</strong> June 1 - November 30, with peak activity August-October</li>
-        <li><strong>Pacific Season:</strong> May 15 - November 30, with peak activity July-September</li>
-        <li><strong>Geographic Areas:</strong> Atlantic Ocean, Gulf of Mexico, Caribbean Sea, Pacific Ocean</li>
-        <li><strong>Weather Patterns:</strong> African easterly waves, El Niño/La Niña cycles</li>
-        </ul>
-        
-        <p class="large-text"><strong>🌀 Hurricane Structure:</strong></p>
-        <ul class="large-text">
-        <li><strong>Eye:</strong> Calm center with clear skies, typically 20-40 miles wide</li>
-        <li><strong>Eyewall:</strong> Surrounds eye with strongest winds and most intense rain</li>
-        <li><strong>Rainbands:</strong> Spiral outward causing heavy showers and gusty winds</li>
-        <li><strong>Outflow:</strong> High-level winds that exhaust the storm's energy</li>
-        <li><strong>Storm Surge:</strong> Abnormal rise in sea level caused by wind and pressure</li>
-        </ul>
-        
-        <p class="large-text"><strong>📊 Saffir-Simpson Hurricane Scale:</strong></p>
-        <ul class="large-text">
-        <li><strong>Category 1 (74-95 mph):</strong> Very dangerous winds, some damage</li>
-        <li><strong>Category 2 (96-110 mph):</strong> Extremely dangerous winds, extensive damage</li>
-        <li><strong>Category 3 (111-129 mph):</strong> Devastating damage, major hurricane</li>
-        <li><strong>Category 4 (130-156 mph):</strong> Catastrophic damage, major hurricane</li>
-        <li><strong>Category 5 (157+ mph):</strong> Catastrophic damage, major hurricane</li>
-        </ul>
-        
-        <p class="large-text"><strong>🚨 Warning Signs:</strong></p>
-        <ul class="large-text">
-        <li><strong>Weather forecasts</strong> - Hurricane Watches and Warnings</li>
-        <li><strong>Ocean conditions</strong> - Increasing wave heights and surf</li>
-        <li><strong>Wind changes</strong> - Gradual increase in wind speed and direction</li>
-        <li><strong>Pressure drops</strong> - Falling barometric pressure</li>
-        <li><strong>Cloud formations</strong> - Cirrus clouds followed by thickening overcast</li>
-        <li><strong>Rain bands</strong> - Intermittent heavy rain and wind</li>
-        </ul>
-        
-        <p class="large-text"><strong>🛡️ Safety Measures:</strong></p>
-        <ul class="large-text">
-        <li><strong>Evacuation:</strong> Follow evacuation orders early, don't wait until last minute</li>
-        <li><strong>Home Preparation:</strong> Secure outdoor objects, install storm shutters</li>
-        <li><strong>Emergency Kit:</strong> Water, food, medications, important documents, cash</li>
-        <li><strong>Communication Plan:</strong> Have family emergency plan and contact information</li>
-        <li><strong>Insurance:</strong> Ensure adequate coverage for wind and flood damage</li>
-        <li><strong>Stay Informed:</strong> Monitor weather updates and emergency broadcasts</li>
-        <li><strong>After Storm:</strong> Wait for official clearance before returning home</li>
-        </ul>
-        
-        <p class="large-text"><strong>📚 Historical Accounts:</strong></p>
-        <ul class="large-text">
-        <li><strong>Galveston Hurricane (1900):</strong> Deadliest US hurricane, killed 8,000+ people</li>
-        <li><strong>Hurricane Katrina (2005):</strong> Caused $125 billion damage, killed 1,833 people</li>
-        <li><strong>Hurricane Sandy (2012):</strong> Superstorm affected 24 states, caused $70 billion damage</li>
-        <li><strong>Hurricane Maria (2017):</strong> Devastated Puerto Rico, caused longest blackout in US history</li>
-        <li><strong>Hurricane Harvey (2017):</strong> Dropped 60+ inches of rain, caused catastrophic flooding</li>
-        </ul>
-        </div>
-        """, unsafe_allow_html=True)
+    # 8. The Science Behind Weather Phenomena
+    with learn_tabs[7]:
+        st.markdown('<h3 class="subsection-header">🔬 The Science Behind Weather Phenomena</h3>', unsafe_allow_html=True)
+        st.markdown('<div class="metric-card">Short explainers on how tornadoes, hail, lightning, and more form.</div>', unsafe_allow_html=True)
+        science_topic = st.selectbox("Choose a phenomenon", ["Tornadoes", "Hail", "Lightning", "Rainbows", "Snow"], key="science_topic_select")
+        st.markdown(f"<div class='metric-card'><strong>You selected phenomenon:</strong> {science_topic}</div>", unsafe_allow_html=True)
+        if science_topic == "Tornadoes":
+            st.markdown("Tornadoes form when warm, moist air meets cold, dry air, creating instability and wind shear. Updrafts tilt rotation vertically, forming a funnel.")
+        elif science_topic == "Hail":
+            st.markdown("Hail forms in strong thunderstorms with intense updrafts. Water droplets are carried upward, freeze, and fall as hailstones.")
+        elif science_topic == "Lightning":
+            st.markdown("Lightning is a giant spark caused by charge separation in clouds. It equalizes the charge between cloud and ground or within clouds.")
+        elif science_topic == "Rainbows":
+            st.markdown("Rainbows form when sunlight is refracted, reflected, and dispersed in raindrops, creating a spectrum of colors.")
+        elif science_topic == "Snow":
+            st.markdown("Snow forms when water vapor in clouds freezes into ice crystals, which stick together and fall as snowflakes.")
 
-    # General safety tips section
-    st.markdown("---")
-    st.markdown('<h3 class="subsection-header">⚠️ General Severe Weather Safety Tips</h3>', unsafe_allow_html=True)
-    st.markdown('<div class="metric-card"><ul class="large-text"><li>Always have multiple ways to receive weather alerts (smartphone apps, NOAA Weather Radio, local news)</li><li>Prepare a family emergency plan and practice it regularly</li><li>Assemble an emergency kit: water, non-perishable food, flashlight, batteries, medications, important documents</li><li>Know your community\'s emergency shelters and evacuation routes</li><li>Never underestimate the power of severe weather—stay informed and act promptly</li></ul></div>', unsafe_allow_html=True)
+    # 9. Weather & Health
+    with learn_tabs[8]:
+        st.markdown('<h3 class="subsection-header">🩺 Weather & Health</h3>', unsafe_allow_html=True)
+        st.markdown('<div class="metric-card">How weather affects allergies, asthma, heat stroke, frostbite, and more.</div>', unsafe_allow_html=True)
+        health_topic = st.selectbox("Choose a health topic", ["Allergies", "Asthma", "Heat Stroke", "Frostbite", "Mental Health"], key="health_topic_select")
+        st.markdown(f"<div class='metric-card'><strong>You selected health topic:</strong> {health_topic}</div>", unsafe_allow_html=True)
+        if health_topic == "Allergies":
+            st.markdown("High pollen counts in spring/summer can trigger allergies. Rain can temporarily reduce pollen.")
+        elif health_topic == "Asthma":
+            st.markdown("Thunderstorms and high humidity can worsen asthma. Air quality alerts are important for those with asthma.")
+        elif health_topic == "Heat Stroke":
+            st.markdown("Heat stroke is a life-threatening condition caused by prolonged heat exposure. Stay hydrated and avoid strenuous activity in high heat.")
+        elif health_topic == "Frostbite":
+            st.markdown("Frostbite occurs when skin and tissue freeze due to extreme cold. Dress in layers and cover exposed skin in winter.")
+        elif health_topic == "Mental Health":
+            st.markdown("Seasonal Affective Disorder (SAD) and weather changes can affect mood. Sunlight and outdoor activity can help.")
+
+    # 10. Fun Weather Facts & Trivia
+    with learn_tabs[9]:
+        st.markdown('<h3 class="subsection-header">🎉 Fun Weather Facts & Trivia</h3>', unsafe_allow_html=True)
+        st.markdown('<div class="metric-card">Did you know?</div>', unsafe_allow_html=True)
+        import random
+        facts = [
+            "The highest temperature ever recorded on Earth was 134°F (56.7°C) in Death Valley, CA.",
+            "The coldest temperature ever recorded was -128.6°F (-89.2°C) in Antarctica.",
+            "A single lightning bolt can contain up to 1 billion volts of electricity.",
+            "Raindrops can fall at speeds of up to 22 miles per hour.",
+            "The largest hailstone ever recorded in the US was 8 inches in diameter (South Dakota, 2010).",
+            "Tornadoes can have winds over 300 mph.",
+            "Snowflakes can have up to 200 crystals.",
+            "The wettest place on Earth is Mawsynram, India, with 467 inches of rain per year.",
+            "The driest place on Earth is the Atacama Desert in Chile, where some areas have never recorded rain.",
+            "Hurricanes in the Southern Hemisphere spin clockwise; in the Northern Hemisphere, they spin counterclockwise."
+        ]
+        st.info(random.choice(facts))
 
 # Live Alerts and Historical Alerts Mode
 elif mode in ["Live Alerts", "Historical Alerts"]:
@@ -2756,7 +2763,25 @@ elif mode in ["Live Alerts", "Historical Alerts"]:
             folium.Marker(
                 location=[user_lat, user_lon],
                 popup=f"Your Location ZIP: {user_zip}",
-                icon=folium.Icon(color="blue", icon="home")
+                icon=folium.Icon(color="blue", icon="user")
             ).add_to(m)
+
+        # Add layer control for polygons and heatmap
+        folium.LayerControl().add_to(m)
+
+        # Cluster alert markers if many alerts (use MarkerCluster)
+        if len(filtered_alerts) > 10:
+            marker_cluster = MarkerCluster().add_to(m)
+            for alert in filtered_alerts:
+                geom = alert.get("geometry")
+                if geom and geom["type"] == "Polygon":
+                    coords = geom["coordinates"][0]
+                    lat = sum([c[1] for c in coords]) / len(coords)
+                    lon = sum([c[0] for c in coords]) / len(coords)
+                    folium.Marker(
+                        location=[lat, lon],
+                        popup=alert["properties"].get("headline", "Weather Alert"),
+                        icon=folium.Icon(color="red", icon="exclamation-sign")
+                    ).add_to(marker_cluster)
 
         folium_static(m)
