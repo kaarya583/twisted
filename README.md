@@ -96,7 +96,7 @@ A comprehensive educational application that provides real-time severe weather a
 - Adjust refresh intervals in the auto-refresh configuration
 - Customize educational content in the `load_educational_data()` function
 
-## 📊 Data Sources
+## Data Sources
 
 - **NOAA Weather API**: Real-time and historical weather alerts
 - **OpenAI GPT-4**: Chatbot intelligence and responses
