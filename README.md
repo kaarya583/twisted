@@ -2,35 +2,35 @@
 
 A comprehensive educational application that provides real-time severe weather alerts from NOAA and features an intelligent chatbot for weather education.
 
-## 🚀 Features
+## Features
 
-### 📡 Live Weather Alerts
+### Live Weather Alerts
 - Real-time severe weather alerts from NOAA API
 - Interactive map with color-coded severity levels
 - Filter alerts by state, event type, and proximity to your ZIP code
 - Historical alert data retrieval
 - Export functionality for data analysis
 
-### 🤖 Weather Expert Chatbot
+### Weather Expert Chatbot
 - AI-powered chatbot with comprehensive weather knowledge
 - Real-time integration with current weather conditions
 - Educational responses about severe weather phenomena
 - Safety tips and emergency preparedness guidance
 - Quick question buttons for common weather queries
 
-### 📚 Educational Center
+### Educational Center
 - Comprehensive guides on tornadoes, thunderstorms, flash floods, winter storms, and hurricanes
 - Enhanced Fujita Scale explanations
 - Warning signs and safety protocols
 - Interactive tabs for different weather phenomena
 
-### 🗺️ Interactive Mapping
+### Interactive Mapping
 - Folium-based interactive maps
 - Heat map visualization of alert density
 - Color-coded severity indicators
 - User location marking with ZIP code input
 
-## 🛠️ Installation
+## Installation
 
 1. **Clone the repository**
    ```bash
@@ -54,13 +54,13 @@ A comprehensive educational application that provides real-time severe weather a
    streamlit run twisted.py
    ```
 
-## 📋 Prerequisites
+## Prerequisites
 
 - Python 3.8 or higher
 - OpenAI API key (for chatbot functionality)
 - Internet connection (for NOAA API access)
 
-## 🎯 Usage
+## Usage
 
 ### Live Alerts Mode
 - View real-time severe weather alerts
@@ -102,7 +102,7 @@ A comprehensive educational application that provides real-time severe weather a
 - **OpenAI GPT-4**: Chatbot intelligence and responses
 - **Educational Content**: Curated meteorological information
 
-## 🏗️ Project Structure
+## Project Structure
 
 ```
 twisted/
@@ -121,7 +121,7 @@ twisted/
     └── retriever.py       # FAISS index and retrieval
 ```
 
-## 🔍 Key Features Explained
+## Key Features Explained
 
 ### Real-Time Data Integration
 The app fetches live weather alerts from NOAA's public API every 5 minutes, providing users with the most current severe weather information.
@@ -139,7 +139,7 @@ The chatbot combines:
 - **Color Coding**: Severity-based color schemes
 - **User Location**: ZIP code-based proximity filtering
 
-## 🚨 Safety Information
+## Safety Information
 
 This application provides educational information and real-time weather data. However:
 - Always follow official weather warnings and evacuation orders
@@ -147,7 +147,7 @@ This application provides educational information and real-time weather data. Ho
 - Have an emergency plan and kit ready
 - Never rely solely on this app for life-threatening weather decisions
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch
@@ -155,18 +155,18 @@ This application provides educational information and real-time weather data. Ho
 4. Test thoroughly
 5. Submit a pull request
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - NOAA for providing the weather data API
 - OpenAI for the chatbot intelligence
 - Streamlit for the web application framework
 - The meteorological community for educational content
 
-## 📞 Support
+## Support
 
 For questions or issues:
 - Check the documentation
